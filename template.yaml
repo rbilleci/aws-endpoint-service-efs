@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: VPC Endpoint Service for EFS
+Parameters:
+
+  ConsumerAccount:
+    Description: |
+      Account number of the AWS account which access is permitted, e.g. 123456789012
+    Type: String
+
+  VPCCIDR:
+    Description: |
+      VPC CIDR Range for account EFS Volume will be deployed to. Example: 172.31.0.0/16.
+      Required for the Security Group.
+    Type: String
+
+  VPCID:
+    Description: |
+      VPC ID for account EFS Volume will be deployed to.
+    Type: AWS::EC2::VPC::Id
+
+  VPCSubnets:
+    Description: |
+      VPC Subnets for account EFS Volume will be deployed to.
+      Please specify at least two subnets.
+    Type: List<AWS::EC2::Subnet::Id>
+
+Resources:
+
+
+  # EFS Volume
+  EFS:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+
+  EFSMountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !GetAtt EFS.FileSystemId
+      SecurityGroups: [ !Ref EFSSecurityGroup ]
+      SubnetId: !Select [ 0, !Ref VPCSubnets ]
+
+  EFSMountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !GetAtt EFS.FileSystemId
+      SecurityGroups: [ !Ref EFSSecurityGroup ]
+      SubnetId: !Select [ 1, !Ref VPCSubnets ]
+
+  # Security group protecting the EFS volume
+  # The security group limits access to clients from the same VPC
+  # Access is restricted to port 2049, so only NFSv4 clients can connect!
+  EFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EFS Security Group
+      SecurityGroupIngress:
+        - CidrIp: !Ref VPCCIDR
+          Description: TCP access to NFS
+          FromPort: 2049
+          IpProtocol: TCP
+          ToPort: 2049
+      VpcId: !Ref VPCID
+
+  # Network Load Balancer for EFS, required for VPC Endpoint Services
+  NLB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      LoadBalancerAttributes:
+        - Key: load_balancing.cross_zone.enabled
+          Value: true
+      Name: vpces-efs
+      Scheme: internal
+      Subnets: !Ref VPCSubnets
+      Type: network
+
+  NLBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn: !Ref NLBTargetGroup
+      LoadBalancerArn: !Ref NLB
+      Port: 2049
+      Protocol: TCP
+
+  NLBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckPort: 2049
+      HealthCheckProtocol: TCP
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 3
+      Protocol: TCP
+      Port: 2049
+      Targets:
+        - Id: !GetAtt EFSMountTarget1.IpAddress
+        - Id: !GetAtt EFSMountTarget2.IpAddress
+      TargetType: ip
+      VpcId: !Ref VPCID
+
+  # VPC Endpoint Service
+  # Fronts the Network Load Balancer
+  VPCEndpointService:
+    Type: AWS::EC2::VPCEndpointService
+    Properties:
+      AcceptanceRequired: true
+      NetworkLoadBalancerArns: [ !Ref NLB ]
+
+  VPCEndpointServicePermission:
+    Type: AWS::EC2::VPCEndpointServicePermissions
+    Properties:
+      AllowedPrincipals:
+        - !Sub arn:aws:iam::${ConsumerAccount}:root
+      ServiceId: !Ref VPCEndpointService
+
+Outputs:
+
+  VPCESServiceID:
+    Value: !Ref VPCEndpointService
+    Export:
+      Name: vpces-service-id
+
+  VPCESServiceName:
+    Value: !Sub com.amazonaws.vpce.${AWS::Region}.${VPCEndpointService}
+    Export:
+      Name: vpces-service-name
+
+  VPCESDNSName:
+    Value: !Sub ${VPCEndpointService}.${AWS::Region}.vpce.amazonaws.com
+    Export:
+      Name: vpces-dns-name
