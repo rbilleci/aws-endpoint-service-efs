@@ -1,5 +1,7 @@
 # AWS VPC Endpoint Service for EFS
 
+`NOTICE: This project is an example and not intended for production deployments.`
+
 This AWS CloudFormation shows how to make EFS accessible to another account using VPC Endpoint Services.
 
 ### Instructions
@@ -25,7 +27,11 @@ This AWS CloudFormation shows how to make EFS accessible to another account usin
 
    Make sure to replace `VPC_ENDPOINT_DNS_NAME`
 
-### Optimization
+### Optimizations
 
-The EFS volume is configured to use the default settings. You may need to adjust the throughput and mode of the volume
+- **Availability** - this example demonstrates deployment of EFS and the NLB to two Availability Zones. 
+For production, you may want to deploy to three or more Availability Zones.
+- **EFS Performance** - the EFS volume is configured to use the default settings. You may need to adjust the throughput and mode of the volume
 for your use case.
+- **Network Load Balancer / Cross Zone Load Balancing** - you may want to review this setting and adapt.
+- **Network Load Balancer / Sticky Sessions** - you may want/need to enable sticky sessions based on source ip address.
