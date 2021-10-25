@@ -13,7 +13,7 @@ This AWS CloudFormation shows how to make EFS accessible to another account usin
    - VPC Subnets for the EFS mount targets.
    - VPC CIDR Range, used to restrict access to the EFS volume
 2. When the template is deployed, the AWS CloudFormation Outputs shows the `service name` of the VPC Endpoint Service. 
-  Provide this service name must be shared with the other account. 
+  Provide this service name to the consumer account. 
 3. In the consumer account, create a new VPC Endpoint, using the `service name`.
    Specify a Security Group that allows ingress to port 2049.
    The consumer must wait for acceptance.
