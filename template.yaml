@@ -51,14 +51,20 @@ Resources:
 
   # Security group protecting the EFS volume
   # The security group limits access to clients from the same VPC
-  # Access is restricted to port 2049, so only NFSv4 clients can connect!
+  # Access is restricted to port 2049, so only NFSv4 clients can connect.
   EFSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: EFS Security Group
       SecurityGroupIngress:
         - CidrIp: !Ref VPCCIDR
-          Description: TCP access to NFS
+          Description: NFS Ingress Rule
+          FromPort: 2049
+          IpProtocol: TCP
+          ToPort: 2049
+      SecurityGroupEgress: # Note that cfn-nag requires explicitly setting an egress rule.
+        - CidrIp: !Ref VPCCIDR
+          Description: NFS Egress Rule
           FromPort: 2049
           IpProtocol: TCP
           ToPort: 2049
@@ -72,7 +78,6 @@ Resources:
       LoadBalancerAttributes:
         - Key: load_balancing.cross_zone.enabled
           Value: true
-      Name: vpces-efs
       Scheme: internal
       Subnets: !Ref VPCSubnets
       Type: network
