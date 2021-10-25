@@ -4,6 +4,9 @@
 
 This AWS CloudFormation shows how to make EFS accessible to another account using VPC Endpoint Services.
 
+![EFS Example](diagram.png)
+
+
 ### Instructions
 
 1. The template should be deployed in the AWS account managing the EFS volume. You will need to provide the following 
